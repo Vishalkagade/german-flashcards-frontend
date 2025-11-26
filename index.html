@@ -1,0 +1,563 @@
+<!DOCTYPE "html">
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>German Vocabulary Flashcards</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* Perspective is needed for the 3D flip effect on the card */
+        .perspective-1000 { perspective: 1000px; }
+        /* Ensures the script content is not rendered as visible text */
+        [type="text/babel"] { display: none; }
+    </style>
+
+    <!-- React, ReactDOM, and Babel CDNs -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // ===========================
+        // Backend configuration
+        // ===========================
+        // While developing locally, your backend runs on:
+        //   http://localhost:3000
+        // Later, when you deploy the backend to the cloud,
+        // you will change this URL to your real server URL.
+        const BACKEND_URL = "https://german-flashcard-backend.onrender.com";
+
+        // Using React's useState and useEffect from the global scope
+        const { useState, useEffect } = React;
+
+        /**
+         * Utility function to handle exponential backoff for API retries.
+         * @param {function} fn - The function to execute.
+         * @param {number} maxRetries - Maximum number of retries.
+         */
+        const withExponentialBackoff = async (fn, maxRetries = 5) => {
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    return await fn();
+                } catch (error) {
+                    if (i === maxRetries - 1) {
+                        console.error("Max retries reached. Failing.", error);
+                        throw error;
+                    }
+                    const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+        };
+
+        // --- Flashcard Component ---
+        const Flashcard = ({ card, deleteCard }) => {
+            const [isFlipped, setIsFlipped] = useState(false);
+
+            // Color gradient classes for a nice visual appeal
+            const cardBgClass = {
+                1: 'bg-gradient-to-br from-indigo-400 to-purple-500',
+                2: 'bg-gradient-to-br from-emerald-400 to-cyan-500',
+                3: 'bg-gradient-to-br from-red-400 to-orange-500',
+                4: 'bg-gradient-to-br from-pink-400 to-fuchsia-500',
+                5: 'bg-gradient-to-br from-amber-400 to-yellow-500',
+            };
+
+            // Cycle through colors using the card's ID hash
+            const colorIndex = (card.id.length % 5) + 1;
+            const bgColor = cardBgClass[colorIndex];
+            // German side includes the word and generated grammar details
+            const germanText = card.german;
+            // English side only shows the translation
+            const englishText = card.english;
+            
+            const text = isFlipped ? englishText : germanText;
+            const label = isFlipped ? 'English Translation' : 'German Word & Details';
+
+            const handleFlip = () => {
+                setIsFlipped(prev => !prev);
+            };
+
+            const handleDelete = (e) => {
+                // Stop event from propagating to the card flip handler
+                e.stopPropagation();
+                deleteCard(card.id);
+            };
+
+            return (
+                <div
+                    className={`
+                        relative min-h-96 w-full max-w-lg p-8 pb-16 overflow-hidden
+                        ${bgColor} text-white rounded-2xl shadow-2xl transform transition-all duration-500
+                        hover:scale-105 cursor-pointer perspective-1000
+                    `}
+                    onClick={handleFlip}
+                    // Keep style here for the 3D flip effect
+                    style={{ transformStyle: 'preserve-3d', transition: 'transform 0.6s' }} 
+                >
+                    <div className='flex flex-col items-center justify-center h-full min-h-80'>
+                        <p className="text-base font-semibold mb-4 opacity-80">{label}</p>
+                        <h3 className="text-3xl md:text-4xl font-extrabold text-center break-words px-4 whitespace-pre-wrap">
+                            {text}
+                        </h3>
+                    </div>
+
+                    <button
+                        onClick={handleDelete}
+                        className="absolute bottom-4 right-4 p-2 text-white opacity-90 hover:opacity-100 transition duration-200 rounded-full bg-red-600/60 hover:bg-red-700 shadow-lg"
+                        title="Mark as Learned (Delete Card)"
+                    >
+                        {/* Trash/Delete icon for "learned" action */}
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                </div>
+            );
+        };
+
+
+        // --- Main Application Component ---
+        const App = () => {
+            const [cards, setCards] = useState([]);
+            
+            // State for user input and translation process
+            const [newGerman, setNewGerman] = useState('');
+            const [currentTranslation, setCurrentTranslation] = useState(null); // Stores {german, english}
+            const [isTranslating, setIsTranslating] = useState(false);
+            
+            const [message, setMessage] = useState('');
+            const [isLoading, setIsLoading] = useState(true);
+
+            // Stack navigation state
+            const [currentCardIndex, setCurrentCardIndex] = useState(0);
+
+            // Voice input state
+            const [isListening, setIsListening] = useState(false);
+            const [voiceSupported, setVoiceSupported] = useState(false);
+
+            // LocalStorage key for storing flashcards
+            const STORAGE_KEY = 'german_flashcards';
+
+            // Load flashcards from localStorage on component mount
+            useEffect(() => {
+                try {
+                    const storedCards = localStorage.getItem(STORAGE_KEY);
+                    if (storedCards) {
+                        const parsedCards = JSON.parse(storedCards);
+                        // Sort by German word for easier reference
+                        parsedCards.sort((a, b) => a.german.localeCompare(b.german));
+                        setCards(parsedCards);
+                    }
+                    setIsLoading(false);
+                } catch (error) {
+                    console.error("Error loading flashcards from localStorage:", error);
+                    setMessage('Error loading saved flashcards.');
+                    setIsLoading(false);
+                }
+
+                // Check if browser supports voice recognition
+                if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                    setVoiceSupported(true);
+                }
+            }, []);
+
+            // Save flashcards to localStorage whenever cards change
+            const saveCardsToStorage = (updatedCards) => {
+                try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedCards));
+                } catch (error) {
+                    console.error("Error saving flashcards to localStorage:", error);
+                    setMessage('Error saving flashcards.');
+                }
+            };
+
+            // Voice input function
+            const startVoiceInput = () => {
+                if (!voiceSupported) {
+                    setMessage('Voice input is not supported in your browser. Try Chrome or Edge.');
+                    return;
+                }
+
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                const recognition = new SpeechRecognition();
+                
+                recognition.lang = 'de-DE'; // Set to German
+                recognition.interimResults = false;
+                recognition.maxAlternatives = 1;
+
+                recognition.onstart = () => {
+                    setIsListening(true);
+                    setMessage('🎤 Listening... Speak a German word');
+                };
+
+                recognition.onresult = (event) => {
+                    const transcript = event.results[0][0].transcript;
+                    setNewGerman(transcript);
+                    setCurrentTranslation(null);
+                    setMessage(`Heard: "${transcript}". Click Translate to continue.`);
+                };
+
+                recognition.onerror = (event) => {
+                    console.error('Speech recognition error:', event.error);
+                    setIsListening(false);
+                    if (event.error === 'no-speech') {
+                        setMessage('No speech detected. Please try again.');
+                    } else if (event.error === 'not-allowed') {
+                        setMessage('Microphone access denied. Please allow microphone access.');
+                    } else {
+                        setMessage('Voice input error. Please try again.');
+                    }
+                };
+
+                recognition.onend = () => {
+                    setIsListening(false);
+                };
+
+                try {
+                    recognition.start();
+                } catch (error) {
+                    console.error('Error starting recognition:', error);
+                    setIsListening(false);
+                    setMessage('Could not start voice input. Please try again.');
+                }
+            };
+
+
+            // ===============================
+            // Function to call YOUR BACKEND
+            // ===============================
+            const fetchTranslation = async (e) => {
+                e.preventDefault(); // Prevent form submission/refresh
+                
+                const trimmedGerman = newGerman.trim();
+                if (!trimmedGerman) {
+                    setMessage('Please enter a German word to translate.');
+                    return;
+                }
+
+                setIsTranslating(true);
+                setCurrentTranslation(null);
+                setMessage('Translating and finding details...');
+
+                try {
+                    const result = await withExponentialBackoff(async () => {
+                        const response = await fetch(`${BACKEND_URL}/translate`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ germanWord: trimmedGerman }),
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+
+                        return response.json();
+                    });
+
+                    // result is what the backend returned:
+                    // { german: "...", english: "...", raw: {...} }
+                    setCurrentTranslation({
+                        german: result.german,
+                        english: result.english,
+                    });
+                    setMessage(`Translation found! Confirm the details and click 'Add Card' to save.`);
+
+                } catch (error) {
+                    console.error("API Error:", error);
+                    if (error.message && error.message.includes('401')) {
+                        setMessage('Translation failed: Authorization error (HTTP 401).');
+                    } else if (error.message && error.message.includes('400')) {
+                        setMessage('Translation failed: Bad Request (HTTP 400).');
+                    } else {
+                        setMessage('Translation failed due to an API error. Check console.');
+                    }
+                } finally {
+                    setIsTranslating(false);
+                }
+            };
+
+
+            // Function to add a new card
+            const addCard = () => {
+                // This function is only called after a translation is successful
+                if (!currentTranslation) {
+                    setMessage('Please translate the word first.');
+                    return;
+                }
+
+                try {
+                    const newCard = {
+                        id: Date.now().toString(), // Simple unique ID
+                        german: currentTranslation.german, 
+                        english: currentTranslation.english, 
+                        createdAt: new Date().toISOString(),
+                    };
+
+                    const updatedCards = [...cards, newCard];
+                    // Sort by German word
+                    updatedCards.sort((a, b) => a.german.localeCompare(b.german));
+                    
+                    setCards(updatedCards);
+                    saveCardsToStorage(updatedCards);
+
+                    // Clear inputs and reset translation state
+                    setNewGerman('');
+                    setCurrentTranslation(null);
+                    setMessage('Flashcard added successfully!');
+                    setTimeout(() => setMessage(''), 3000);
+
+                } catch (error) {
+                    console.error("Error adding flashcard: ", error);
+                    setMessage('Error adding flashcard. Check console.');
+                }
+            };
+
+            // Function to delete a card (Mark as Learned)
+            const deleteCard = (id) => {
+                try {
+                    const updatedCards = cards.filter(card => card.id !== id);
+                    setCards(updatedCards);
+                    saveCardsToStorage(updatedCards);
+
+                    setMessage('Flashcard marked as learned and removed!');
+                    setTimeout(() => setMessage(''), 3000);
+                    
+                } catch (error) {
+                    console.error("Error removing flashcard: ", error);
+                    setMessage('Error deleting flashcard. Check console.');
+                }
+            };
+
+            const actionDisabled = isTranslating || isLoading;
+            const isTranslationPending = newGerman.trim() && !currentTranslation;
+            const isReadyToAdd = !!currentTranslation;
+
+            // Navigation functions
+            const goToNext = () => {
+                if (currentCardIndex < cards.length - 1) {
+                    setCurrentCardIndex(currentCardIndex + 1);
+                }
+            };
+
+            const goToPrevious = () => {
+                if (currentCardIndex > 0) {
+                    setCurrentCardIndex(currentCardIndex - 1);
+                }
+            };
+
+            const currentCard = cards[currentCardIndex];
+            const hasCards = cards.length > 0;
+
+
+            return (
+                <div className="min-h-screen p-4 sm:p-8 bg-gray-50 font-inter">
+                    <header className="text-center mb-10">
+                        <h1 className="text-4xl font-extrabold text-indigo-700">
+                            German Vocabulary Flashcards 
+                        </h1>
+                        <p className="text-sm text-gray-500 mt-2">
+                            Enter a German word, translate it, and click a card to flip it!
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                            💾 All flashcards are saved locally in your browser
+                        </p>
+                    </header>
+
+                    {/* Notification/Message area */}
+                    {message && (
+                        <div className="bg-indigo-100 border-l-4 border-indigo-500 text-indigo-700 p-4 rounded mb-6 max-w-xl mx-auto" role="alert">
+                            <p className="font-bold">Info</p>
+                            <p>{message}</p>
+                        </div>
+                    )}
+
+                    {/* Card Creation Form */}
+                    <div className="max-w-xl mx-auto p-6 bg-white rounded-xl shadow-lg mb-10">
+                        <h2 className="text-2xl font-bold mb-4 text-gray-700">Vocabulary Translator &amp; Creator</h2>
+                        <form onSubmit={fetchTranslation} className="space-y-4">
+                            
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="Enter German Word (e.g., Baum or gehen)"
+                                    value={newGerman}
+                                    onChange={(e) => {
+                                        setNewGerman(e.target.value);
+                                        setCurrentTranslation(null); // Clear translation on new input
+                                    }}
+                                    className="w-full p-3 pr-12 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
+                                    required
+                                    disabled={isTranslating || isListening}
+                                />
+                                
+                                {/* Voice Input Button */}
+                                {voiceSupported && (
+                                    <button
+                                        type="button"
+                                        onClick={startVoiceInput}
+                                        disabled={isTranslating || isListening}
+                                        className={`
+                                            absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg transition duration-200
+                                            ${isListening 
+                                                ? 'bg-red-500 text-white animate-pulse' 
+                                                : 'bg-gray-100 text-gray-600 hover:bg-indigo-100 hover:text-indigo-600'}
+                                            disabled:opacity-50 disabled:cursor-not-allowed
+                                        `}
+                                        title="Voice Input (German)"
+                                    >
+                                        {isListening ? (
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                                                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                                                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                                            </svg>
+                                        ) : (
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                                            </svg>
+                                        )}
+                                    </button>
+                                )}
+                            </div>
+                            
+                            {/* Translation Button */}
+                            <button
+                                type="submit"
+                                className={`
+                                    w-full font-bold py-3 rounded-lg shadow-md transition duration-200
+                                    ${isTranslating 
+                                        ? 'bg-gray-400 text-gray-700 cursor-not-allowed' 
+                                        : 'bg-indigo-600 hover:bg-indigo-700 text-white'}
+                                    disabled:opacity-50
+                                `}
+                                disabled={actionDisabled || !isTranslationPending}
+                            >
+                                {isTranslating ? (
+                                    <div className="flex items-center justify-center">
+                                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Translating...
+                                    </div>
+                                ) : 'Step 1: Translate Word'}
+                            </button>
+                            
+                            {/* Display Translation Result and Add Button */}
+                            {currentTranslation && (
+                                <div className="mt-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg space-y-2">
+                                    <p className="text-sm font-semibold text-gray-600">Generated Translation:</p>
+                                    <p className="text-lg font-bold text-indigo-800">
+                                        {currentTranslation.german.split('\n')[0]} → {currentTranslation.english}
+                                    </p>
+                                    {/* Safely display the third line of the German text (the details) */}
+                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                                        {currentTranslation.german.split('\n')[2]}
+                                    </p>
+                                    
+                                    <button
+                                        type="button"
+                                        onClick={addCard}
+                                        className="w-full mt-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg shadow-md transition duration-200 disabled:opacity-50"
+                                        disabled={actionDisabled || !isReadyToAdd}
+                                    >
+                                        Step 2: Add Card
+                                    </button>
+                                </div>
+                            )}
+                        </form>
+                    </div>
+
+                    {/* Flashcard Display Area */}
+                    <div className="max-w-2xl mx-auto">
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-3xl font-bold text-gray-700">
+                                Your Flashcards
+                            </h2>
+                            {hasCards && (
+                                <span className="text-lg font-semibold text-indigo-600">
+                                    {currentCardIndex + 1} / {cards.length}
+                                </span>
+                            )}
+                        </div>
+                        
+                        {isLoading && cards.length === 0 && (
+                            <div className="text-center p-10 text-gray-500">
+                                <svg className="animate-spin mx-auto h-8 w-8 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <p className="mt-4">Loading your vocabulary...</p>
+                            </div>
+                        )}
+                        
+                        {!isLoading && cards.length === 0 && (
+                            <div className="text-center p-10 text-gray-500 border border-dashed rounded-lg">
+                                <p className="text-lg">
+                                    No flashcards yet! Use the translator above to start building your German vocabulary list.
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Stack View - Single Card Display */}
+                        {hasCards && (
+                            <div className="relative">
+                                {/* Main Card */}
+                                <div className="flex justify-center mb-8">
+                                    <Flashcard 
+                                        key={currentCard.id} 
+                                        card={currentCard} 
+                                        deleteCard={deleteCard} 
+                                    />
+                                </div>
+
+                                {/* Navigation Controls */}
+                                <div className="flex items-center justify-center gap-4">
+                                    <button
+                                        onClick={goToPrevious}
+                                        disabled={currentCardIndex === 0}
+                                        className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition duration-200"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                        </svg>
+                                        Previous
+                                    </button>
+
+                                    <button
+                                        onClick={goToNext}
+                                        disabled={currentCardIndex === cards.length - 1}
+                                        className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition duration-200"
+                                    >
+                                        Next
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                    </button>
+                                </div>
+
+                                {/* Keyboard Shortcuts Hint */}
+                                <p className="text-center text-sm text-gray-400 mt-4">
+                                    💡 Tip: Click the card to flip it, click the trash icon to mark as learned
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // Render the main component
+        const rootElement = document.getElementById('root');
+        ReactDOM.createRoot(rootElement).render(<App />);
+
+    </script>
+</body>
+</html>
