@@ -35,7 +35,8 @@
         const BACKEND_URL = "https://german-flashcard-backend.onrender.com";
 
         // Using React's useState and useEffect from the global scope
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useRef } = React;
+
 
         /**
          * Utility function to handle exponential backoff for API retries.
@@ -58,8 +59,13 @@
         };
 
         // --- Flashcard Component ---
-        const Flashcard = ({ card, deleteCard }) => {
+        const Flashcard = ({ card, deleteCard, onSwipeLeft, onSwipeRight }) => {
             const [isFlipped, setIsFlipped] = useState(false);
+
+            // Touch tracking
+            const touchStartX = useRef(0);
+            const touchStartY = useRef(0);
+            const isSwiping = useRef(false);
 
             // Color gradient classes for a nice visual appeal
             const cardBgClass = {
@@ -73,11 +79,9 @@
             // Cycle through colors using the card's ID hash
             const colorIndex = (card.id.length % 5) + 1;
             const bgColor = cardBgClass[colorIndex];
-            // German side includes the word and generated grammar details
+
             const germanText = card.german;
-            // English side only shows the translation
             const englishText = card.english;
-            
             const text = isFlipped ? englishText : germanText;
             const label = isFlipped ? 'English Translation' : 'German Word & Details';
 
@@ -86,9 +90,49 @@
             };
 
             const handleDelete = (e) => {
-                // Stop event from propagating to the card flip handler
+                // Stop event from propagating to the card flip/swipe handler
                 e.stopPropagation();
                 deleteCard(card.id);
+            };
+
+            // --- Touch handlers for swipe ---
+            const handleTouchStart = (e) => {
+                const touch = e.touches[0];
+                touchStartX.current = touch.clientX;
+                touchStartY.current = touch.clientY;
+                isSwiping.current = false;
+            };
+
+            const handleTouchMove = (e) => {
+                const touch = e.touches[0];
+                const dx = touch.clientX - touchStartX.current;
+                const dy = touch.clientY - touchStartY.current;
+
+                // If horizontal movement is dominant and big enough,
+                // mark this interaction as a swipe (not just a tap)
+                if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 20) {
+                    isSwiping.current = true;
+                }
+            };
+
+            const handleTouchEnd = (e) => {
+                const touch = e.changedTouches[0];
+                const dx = touch.clientX - touchStartX.current;
+
+                // If it wasn't really a swipe → treat as tap (flip)
+                if (!isSwiping.current || Math.abs(dx) < 50) {
+                    handleFlip();
+                    return;
+                }
+
+                // It WAS a swipe
+                if (dx < -50 && typeof onSwipeLeft === 'function') {
+                    // Swipe left → next card
+                    onSwipeLeft();
+                } else if (dx > 50 && typeof onSwipeRight === 'function') {
+                    // Swipe right → previous card
+                    onSwipeRight();
+                }
             };
 
             return (
@@ -98,9 +142,13 @@
                         ${bgColor} text-white rounded-2xl shadow-2xl transform transition-all duration-500
                         hover:scale-105 cursor-pointer perspective-1000
                     `}
+                    // Desktop click → flip
                     onClick={handleFlip}
-                    // Keep style here for the 3D flip effect
-                    style={{ transformStyle: 'preserve-3d', transition: 'transform 0.6s' }} 
+                    // Mobile touch → swipe / flip
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                    style={{ transformStyle: 'preserve-3d', transition: 'transform 0.6s' }}
                 >
                     <div className='flex flex-col items-center justify-center h-full min-h-80'>
                         <p className="text-base font-semibold mb-4 opacity-80">{label}</p>
@@ -114,7 +162,6 @@
                         className="absolute bottom-4 right-4 p-2 text-white opacity-90 hover:opacity-100 transition duration-200 rounded-full bg-red-600/60 hover:bg-red-700 shadow-lg"
                         title="Mark as Learned (Delete Card)"
                     >
-                        {/* Trash/Delete icon for "learned" action */}
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
@@ -511,10 +558,12 @@
                             <div className="relative">
                                 {/* Main Card */}
                                 <div className="flex justify-center mb-8">
-                                    <Flashcard 
-                                        key={currentCard.id} 
-                                        card={currentCard} 
-                                        deleteCard={deleteCard} 
+                                    <Flashcard
+                                        key={currentCard.id}
+                                        card={currentCard}
+                                        deleteCard={deleteCard}
+                                        onSwipeLeft={goToNext}
+                                        onSwipeRight={goToPrevious}
                                     />
                                 </div>
 
