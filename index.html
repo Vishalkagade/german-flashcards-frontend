@@ -67,20 +67,6 @@
         const touchStartY = useRef(0);
         const isHorizontalSwipe = useRef(false);
 
-        // Color gradient classes for a nice visual appeal
-        const cardBgClass = {
-            1: 'bg-gradient-to-br from-[#D3E5FF] to-[#A3C5FF]',   // soft blue
-            2: 'bg-gradient-to-br from-[#D9F7E5] to-[#A8E6CF]',   // mint green
-            3: 'bg-gradient-to-br from-[#FFF4CC] to-[#FFD28E]',   // warm pastel yellow
-            4: 'bg-gradient-to-br from-[#F9DCE1] to-[#F6A6B2]',   // rose pink
-            5: 'bg-gradient-to-br from-[#E8D9F7] to-[#C8A8E5]',   // lavender pastel
-        };
-
-
-        // Cycle through colors using the card's ID hash
-        const colorIndex = (card.id.length % 5) + 1;
-        const bgColor = cardBgClass[colorIndex];
-
         const germanText = card.german;
         const englishText = card.english;
         const text = isFlipped ? englishText : germanText;
