@@ -110,43 +110,28 @@
 
                 // If horizontal movement is dominant and big enough,
                 // mark this interaction as a swipe (not just a tap)
-                if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 30) {
+                if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 20) {
                     isSwiping.current = true;
-                    // Prevent scrolling when swiping horizontally
-                    e.preventDefault();
                 }
             };
 
             const handleTouchEnd = (e) => {
                 const touch = e.changedTouches[0];
                 const dx = touch.clientX - touchStartX.current;
-                const dy = touch.clientY - touchStartY.current;
 
-                // Check if tap on delete button
-                if (e.target.closest('button')) {
+                // If it wasn't really a swipe → treat as tap (flip)
+                if (!isSwiping.current || Math.abs(dx) < 50) {
+                    handleFlip();
                     return;
                 }
 
-                // If it WAS a horizontal swipe
-                if (isSwiping.current && Math.abs(dx) > 50) {
-                    if (dx < 0 && typeof onSwipeLeft === 'function') {
-                        // Swipe left → next card
-                        onSwipeLeft();
-                    } else if (dx > 0 && typeof onSwipeRight === 'function') {
-                        // Swipe right → previous card
-                        onSwipeRight();
-                    }
-                } else if (!isSwiping.current) {
-                    // It was a tap → flip card
-                    handleFlip();
-                }
-                // If it was vertical movement, do nothing (allow page scroll)
-            };
-
-            const handleClick = (e) => {
-                // Only flip on click if not part of a touch interaction
-                if (!e.target.closest('button')) {
-                    handleFlip();
+                // It WAS a swipe
+                if (dx < -50 && typeof onSwipeLeft === 'function') {
+                    // Swipe left → next card
+                    onSwipeLeft();
+                } else if (dx > 50 && typeof onSwipeRight === 'function') {
+                    // Swipe right → previous card
+                    onSwipeRight();
                 }
             };
 
@@ -158,12 +143,12 @@
                         hover:scale-105 cursor-pointer perspective-1000
                     `}
                     // Desktop click → flip
-                    onClick={handleClick}
+                    onClick={handleFlip}
                     // Mobile touch → swipe / flip
                     onTouchStart={handleTouchStart}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
-                    style={{ transformStyle: 'preserve-3d', transition: 'transform 0.6s', touchAction: 'pan-y' }}
+                    style={{ transformStyle: 'preserve-3d', transition: 'transform 0.6s' }}
                 >
                     <div className='flex flex-col items-center justify-center h-full min-h-80'>
                         <p className="text-base font-semibold mb-4 opacity-80">{label}</p>
