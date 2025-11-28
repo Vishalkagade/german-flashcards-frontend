@@ -63,9 +63,9 @@
             const [isFlipped, setIsFlipped] = useState(false);
 
             // Touch tracking
-            const touchStartX = useRef(0);
-            const touchStartY = useRef(0);
-            const isSwiping = useRef(false);
+        const touchStartX = useRef(0);
+        const touchStartY = useRef(0);
+        const isHorizontalSwipe = useRef(false);
 
             // Color gradient classes for a nice visual appeal
             const cardBgClass = {
@@ -97,10 +97,10 @@
 
             // --- Touch handlers for swipe ---
             const handleTouchStart = (e) => {
-                const touch = e.touches[0];
-                touchStartX.current = touch.clientX;
-                touchStartY.current = touch.clientY;
-                isSwiping.current = false;
+            const touch = e.touches[0];
+            touchStartX.current = touch.clientX;
+            touchStartY.current = touch.clientY;
+            isHorizontalSwipe.current = false;
             };
 
             const handleTouchMove = (e) => {
@@ -108,32 +108,38 @@
                 const dx = touch.clientX - touchStartX.current;
                 const dy = touch.clientY - touchStartY.current;
 
-                // If horizontal movement is dominant and big enough,
-                // mark this interaction as a swipe (not just a tap)
-                if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 20) {
-                    isSwiping.current = true;
+                // Only treat as swipe if:
+                // 1. Horizontal distance is bigger than vertical
+                // 2. Horizontal movement is at least 30px
+                if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 30) {
+                    isHorizontalSwipe.current = true;
+                    // Prevent the page from scrolling horizontally
+                    e.preventDefault();
                 }
             };
 
             const handleTouchEnd = (e) => {
                 const touch = e.changedTouches[0];
                 const dx = touch.clientX - touchStartX.current;
+                const dy = touch.clientY - touchStartY.current;
 
-                // If it wasn't really a swipe → treat as tap (flip)
-                if (!isSwiping.current || Math.abs(dx) < 50) {
-                    handleFlip();
+                // If it was NOT a horizontal swipe:
+                if (!isHorizontalSwipe.current) {
+                    // Only flip on TAP (very small movement)
+                    if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+                        handleFlip();
+                    }
                     return;
                 }
 
-                // It WAS a swipe
+                // Handle swipe gestures
                 if (dx < -50 && typeof onSwipeLeft === 'function') {
-                    // Swipe left → next card
                     onSwipeLeft();
                 } else if (dx > 50 && typeof onSwipeRight === 'function') {
-                    // Swipe right → previous card
                     onSwipeRight();
                 }
             };
+
 
             return (
                 <div
