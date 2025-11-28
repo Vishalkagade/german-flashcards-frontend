@@ -131,7 +131,7 @@
                         // Swipe right → previous card
                         onSwipeRight();
                     }
-                } else if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+                } else if (!isSwiping.current && Math.abs(dx) < 30 && Math.abs(dy) < 30) {
                     // It was a tap (minimal movement) → flip card
                     handleFlip();
                 }
