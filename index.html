@@ -69,12 +69,13 @@
 
         // Color gradient classes for a nice visual appeal
         const cardBgClass = {
-            1: 'bg-gradient-to-br from-indigo-400 to-purple-500',
-            2: 'bg-gradient-to-br from-emerald-400 to-cyan-500',
-            3: 'bg-gradient-to-br from-red-400 to-orange-500',
-            4: 'bg-gradient-to-br from-pink-400 to-fuchsia-500',
-            5: 'bg-gradient-to-br from-amber-400 to-yellow-500',
+            1: 'bg-gradient-to-br from-[#D3E5FF] to-[#A3C5FF]',   // soft blue
+            2: 'bg-gradient-to-br from-[#D9F7E5] to-[#A8E6CF]',   // mint green
+            3: 'bg-gradient-to-br from-[#FFF4CC] to-[#FFD28E]',   // warm pastel yellow
+            4: 'bg-gradient-to-br from-[#F9DCE1] to-[#F6A6B2]',   // rose pink
+            5: 'bg-gradient-to-br from-[#E8D9F7] to-[#C8A8E5]',   // lavender pastel
         };
+
 
         // Cycle through colors using the card's ID hash
         const colorIndex = (card.id.length % 5) + 1;
@@ -138,19 +139,18 @@
 
 
             return (
-                <div
-                    className={`
-                        relative min-h-96 w-full max-w-lg p-8 pb-16 overflow-hidden
-                        ${bgColor} text-white rounded-2xl shadow-2xl transform transition-all duration-500
-                        hover:scale-105 cursor-pointer perspective-1000
-                    `}
-
-                    // Mobile touch → swipe / flip
-                    onTouchStart={handleTouchStart}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={handleTouchEnd}
-                    style={{ transformStyle: 'preserve-3d', transition: 'transform 0.6s' }}
-                >
+                    <div
+                        className={`
+                            relative min-h-96 w-full max-w-lg p-8 pb-16 overflow-hidden
+                            bg-white/20 backdrop-blur-lg border border-white/30 shadow-xl
+                            text-white rounded-2xl transform transition-all duration-500
+                            hover:scale-105 cursor-pointer perspective-1000
+                        `}
+                        onTouchStart={handleTouchStart}
+                        onTouchMove={handleTouchMove}
+                        onTouchEnd={handleTouchEnd}
+                        style={{ transformStyle: 'preserve-3d', transition: 'transform 0.6s' }}
+                    >
                     <div className='flex flex-col items-center justify-center h-full min-h-80'>
                         <p className="text-base font-semibold mb-4 opacity-80">{label}</p>
                         <h3 className="text-3xl md:text-4xl font-extrabold text-center break-words px-4 whitespace-pre-wrap">
