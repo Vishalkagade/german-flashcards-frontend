@@ -67,78 +67,74 @@
         const touchStartY = useRef(0);
         const isHorizontalSwipe = useRef(false);
 
-            // Color gradient classes for a nice visual appeal
-            const cardBgClass = {
-                1: 'bg-gradient-to-br from-indigo-400 to-purple-500',
-                2: 'bg-gradient-to-br from-emerald-400 to-cyan-500',
-                3: 'bg-gradient-to-br from-red-400 to-orange-500',
-                4: 'bg-gradient-to-br from-pink-400 to-fuchsia-500',
-                5: 'bg-gradient-to-br from-amber-400 to-yellow-500',
-            };
+        // Color gradient classes for a nice visual appeal
+        const cardBgClass = {
+            1: 'bg-gradient-to-br from-indigo-400 to-purple-500',
+            2: 'bg-gradient-to-br from-emerald-400 to-cyan-500',
+            3: 'bg-gradient-to-br from-red-400 to-orange-500',
+            4: 'bg-gradient-to-br from-pink-400 to-fuchsia-500',
+            5: 'bg-gradient-to-br from-amber-400 to-yellow-500',
+        };
 
-            // Cycle through colors using the card's ID hash
-            const colorIndex = (card.id.length % 5) + 1;
-            const bgColor = cardBgClass[colorIndex];
+        // Cycle through colors using the card's ID hash
+        const colorIndex = (card.id.length % 5) + 1;
+        const bgColor = cardBgClass[colorIndex];
 
-            const germanText = card.german;
-            const englishText = card.english;
-            const text = isFlipped ? englishText : germanText;
-            const label = isFlipped ? 'English Translation' : 'German Word & Details';
+        const germanText = card.german;
+        const englishText = card.english;
+        const text = isFlipped ? englishText : germanText;
+        const label = isFlipped ? 'English Translation' : 'German Word & Details';
 
-            const handleFlip = () => {
-                setIsFlipped(prev => !prev);
-            };
+        const handleFlip = () => {
+            setIsFlipped(prev => !prev);
+        };
 
-            const handleDelete = (e) => {
-                // Stop event from propagating to the card flip/swipe handler
-                e.stopPropagation();
-                deleteCard(card.id);
-            };
+        const handleDelete = (e) => {
+            // Stop event from propagating to the card flip/swipe handler
+            e.stopPropagation();
+            deleteCard(card.id);
+        };
 
-            // --- Touch handlers for swipe ---
-            const handleTouchStart = (e) => {
+        // --- Touch handlers for swipe ---
+        const handleTouchStart = (e) => {
             const touch = e.touches[0];
             touchStartX.current = touch.clientX;
             touchStartY.current = touch.clientY;
             isHorizontalSwipe.current = false;
-            };
+        };
 
-            const handleTouchMove = (e) => {
-                const touch = e.touches[0];
-                const dx = touch.clientX - touchStartX.current;
-                const dy = touch.clientY - touchStartY.current;
+        const handleTouchMove = (e) => {
+            const touch = e.touches[0];
+            const dx = touch.clientX - touchStartX.current;
+            const dy = touch.clientY - touchStartY.current;
 
-                // Only treat as swipe if:
-                // 1. Horizontal distance is bigger than vertical
-                // 2. Horizontal movement is at least 30px
-                if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 30) {
-                    isHorizontalSwipe.current = true;
-                    // Prevent the page from scrolling horizontally
-                    e.preventDefault();
+            // horizontal swipe detection
+            if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 30) {
+                isHorizontalSwipe.current = true;
+                e.preventDefault(); // stop sideways scroll
+            }
+        };
+
+        const handleTouchEnd = (e) => {
+            const touch = e.changedTouches[0];
+            const dx = touch.clientX - touchStartX.current;
+            const dy = touch.clientY - touchStartY.current;
+
+            // TAP
+            if (!isHorizontalSwipe.current) {
+                if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+                    handleFlip();
                 }
-            };
+                return;
+            }
 
-            const handleTouchEnd = (e) => {
-                const touch = e.changedTouches[0];
-                const dx = touch.clientX - touchStartX.current;
-                const dy = touch.clientY - touchStartY.current;
-
-                // If it was NOT a horizontal swipe:
-                if (!isHorizontalSwipe.current) {
-                    // Only flip on TAP (very small movement)
-                    if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
-                        handleFlip();
-                    }
-                    return;
-                }
-
-                // Handle swipe gestures
-                if (dx < -50 && typeof onSwipeLeft === 'function') {
-                    onSwipeLeft();
-                } else if (dx > 50 && typeof onSwipeRight === 'function') {
-                    onSwipeRight();
-                }
-            };
+            // SWIPE LEFT / RIGHT
+            if (dx < -50 && typeof onSwipeLeft === 'function') {
+                onSwipeLeft();
+            } else if (dx > 50 && typeof onSwipeRight === 'function') {
+                onSwipeRight();
+            }
+        };
 
 
             return (
@@ -148,8 +144,7 @@
                         ${bgColor} text-white rounded-2xl shadow-2xl transform transition-all duration-500
                         hover:scale-105 cursor-pointer perspective-1000
                     `}
-                    // Desktop click → flip
-                    onClick={handleFlip}
+
                     // Mobile touch → swipe / flip
                     onTouchStart={handleTouchStart}
                     onTouchMove={handleTouchMove}
