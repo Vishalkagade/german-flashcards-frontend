@@ -122,6 +122,11 @@
                 const dx = touch.clientX - touchStartX.current;
                 const dy = touch.clientY - touchStartY.current;
 
+                // Check if tap on delete button
+                if (e.target.closest('button')) {
+                    return;
+                }
+
                 // If it WAS a horizontal swipe
                 if (isSwiping.current && Math.abs(dx) > 50) {
                     if (dx < 0 && typeof onSwipeLeft === 'function') {
@@ -131,11 +136,18 @@
                         // Swipe right → previous card
                         onSwipeRight();
                     }
-                } else if (!isSwiping.current && Math.abs(dx) < 30 && Math.abs(dy) < 30) {
-                    // It was a tap (minimal movement) → flip card
+                } else if (!isSwiping.current) {
+                    // It was a tap → flip card
                     handleFlip();
                 }
                 // If it was vertical movement, do nothing (allow page scroll)
+            };
+
+            const handleClick = (e) => {
+                // Only flip on click if not part of a touch interaction
+                if (!e.target.closest('button')) {
+                    handleFlip();
+                }
             };
 
             return (
@@ -146,12 +158,12 @@
                         hover:scale-105 cursor-pointer perspective-1000
                     `}
                     // Desktop click → flip
-                    onClick={handleFlip}
+                    onClick={handleClick}
                     // Mobile touch → swipe / flip
                     onTouchStart={handleTouchStart}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
-                    style={{ transformStyle: 'preserve-3d', transition: 'transform 0.6s' }}
+                    style={{ transformStyle: 'preserve-3d', transition: 'transform 0.6s', touchAction: 'pan-y' }}
                 >
                     <div className='flex flex-col items-center justify-center h-full min-h-80'>
                         <p className="text-base font-semibold mb-4 opacity-80">{label}</p>
