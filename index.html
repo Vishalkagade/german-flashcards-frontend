@@ -110,29 +110,32 @@
 
                 // If horizontal movement is dominant and big enough,
                 // mark this interaction as a swipe (not just a tap)
-                if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 20) {
+                if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 30) {
                     isSwiping.current = true;
+                    // Prevent scrolling when swiping horizontally
+                    e.preventDefault();
                 }
             };
 
             const handleTouchEnd = (e) => {
                 const touch = e.changedTouches[0];
                 const dx = touch.clientX - touchStartX.current;
+                const dy = touch.clientY - touchStartY.current;
 
-                // If it wasn't really a swipe → treat as tap (flip)
-                if (!isSwiping.current || Math.abs(dx) < 50) {
+                // If it WAS a horizontal swipe
+                if (isSwiping.current && Math.abs(dx) > 50) {
+                    if (dx < 0 && typeof onSwipeLeft === 'function') {
+                        // Swipe left → next card
+                        onSwipeLeft();
+                    } else if (dx > 0 && typeof onSwipeRight === 'function') {
+                        // Swipe right → previous card
+                        onSwipeRight();
+                    }
+                } else if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+                    // It was a tap (minimal movement) → flip card
                     handleFlip();
-                    return;
                 }
-
-                // It WAS a swipe
-                if (dx < -50 && typeof onSwipeLeft === 'function') {
-                    // Swipe left → next card
-                    onSwipeLeft();
-                } else if (dx > 50 && typeof onSwipeRight === 'function') {
-                    // Swipe right → previous card
-                    onSwipeRight();
-                }
+                // If it was vertical movement, do nothing (allow page scroll)
             };
 
             return (
