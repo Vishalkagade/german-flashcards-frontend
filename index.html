@@ -127,6 +127,11 @@
             const dx = touch.clientX - touchStartX.current;
             const dy = touch.clientY - touchStartY.current;
 
+            // Check if tap on button
+            if (e.target.closest('button')) {
+                return;
+            }
+
             // TAP
             if (!isHorizontalSwipe.current) {
                 if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
@@ -184,9 +189,18 @@
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
+                                    e.preventDefault();
                                     setShowExamples(!showExamples);
                                 }}
-                                className="mt-4 px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white text-sm font-semibold rounded-full transition duration-200 shadow-lg"
+                                onTouchStart={(e) => {
+                                    e.stopPropagation();
+                                }}
+                                onTouchEnd={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    setShowExamples(!showExamples);
+                                }}
+                                className="mt-4 px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white text-sm font-semibold rounded-full transition duration-200 shadow-lg active:scale-95"
                             >
                                 {showExamples ? 'Hide Examples' : 'Show Examples'}
                             </button>
