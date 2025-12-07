@@ -61,6 +61,12 @@
         // --- Flashcard Component ---
         const Flashcard = ({ card, deleteCard, onSwipeLeft, onSwipeRight }) => {
             const [isFlipped, setIsFlipped] = useState(false);
+            const [showExamples, setShowExamples] = useState(false);
+
+            // Debug logging
+            console.log('Card data:', card);
+            console.log('Card has examples?', card.examples);
+            console.log('Examples length:', card.examples?.length);
 
             // Touch tracking
         const touchStartX = useRef(0);
@@ -157,6 +163,34 @@
                         <h3 className="text-3xl md:text-4xl lg:text-5xl font-black text-center break-words px-6 whitespace-pre-wrap text-white leading-relaxed drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)] max-w-full">
                             {text}
                         </h3>
+
+                        {/* Examples Section */}
+                        {showExamples && card.examples && card.examples.length > 0 && (
+                            <div className="mt-6 w-full px-6 space-y-3 max-h-48 overflow-y-auto">
+                                <div className="border-t border-white/30 pt-4">
+                                    <p className="text-xs font-bold text-white/80 uppercase tracking-wider mb-3">Examples:</p>
+                                    {card.examples.map((example, idx) => (
+                                        <div key={idx} className="bg-black/20 backdrop-blur-sm rounded-lg p-3 mb-2">
+                                            <p className="text-sm font-semibold text-white mb-1">{example.german}</p>
+                                            <p className="text-xs text-white/80 italic">{example.english}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* More Button */}
+                        {card.examples && card.examples.length > 0 && (
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowExamples(!showExamples);
+                                }}
+                                className="mt-4 px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white text-sm font-semibold rounded-full transition duration-200 shadow-lg"
+                            >
+                                {showExamples ? 'Hide Examples' : 'Show Examples'}
+                            </button>
+                        )}
                     </div>
 
                     <button
@@ -317,10 +351,13 @@
                     });
 
                     // result is what the backend returned:
-                    // { german: "...", english: "...", raw: {...} }
+                    // { german: "...", english: "...", examples: [...], raw: {...} }
+                    console.log('Backend response:', result);
+                    console.log('Examples received:', result.examples);
                     setCurrentTranslation({
                         german: result.german,
                         english: result.english,
+                        examples: result.examples || [],
                     });
                     setMessage(`Translation found! Confirm the details and click 'Add Card' to save.`);
 
@@ -351,7 +388,8 @@
                     const newCard = {
                         id: Date.now().toString(), // Simple unique ID
                         german: currentTranslation.german, 
-                        english: currentTranslation.english, 
+                        english: currentTranslation.english,
+                        examples: currentTranslation.examples || [],
                         createdAt: new Date().toISOString(),
                     };
 
