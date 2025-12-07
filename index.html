@@ -128,7 +128,7 @@
                     <div
                         className={`
                             relative min-h-96 w-full max-w-lg p-8 pb-16 overflow-hidden
-                            bg-white/70 backdrop-blur-md border border-white/60 shadow-xl
+                            bg-gradient-to-br from-purple-200/40 to-purple-300/40 backdrop-blur-lg border border-purple-300/30 border border-white/60 shadow-xl
                             text-white rounded-2xl transform transition-all duration-500
                             hover:scale-105 cursor-pointer perspective-1000
                         `}
@@ -138,10 +138,10 @@
                         style={{ transformStyle: 'preserve-3d', transition: 'transform 0.6s' }}
                     >
                     <div className='flex flex-col items-center justify-center h-full min-h-80'>
-                        <p className="text-sm font-semibold mb-4 text-gray-500">
+                        <p className="text-sm font-semibold mb-4 text-white/80 uppercase tracking-wider">
                             {label}
                         </p>
-                        <h3 className="text-3xl md:text-4xl font-extrabold text-center break-words px-4 whitespace-pre-wrap text-gray-900">
+                        <h3 className="text-4xl md:text-5xl font-extrabold text-center break-words px-4 whitespace-pre-wrap text-white leading-tight">
                             {text}
                         </h3>
                     </div>
@@ -178,6 +178,11 @@
             // Voice input state
             const [isListening, setIsListening] = useState(false);
             const [voiceSupported, setVoiceSupported] = useState(false);
+
+            // Shuffle and filter state
+            const [isShuffled, setIsShuffled] = useState(false);
+            const [dateFilter, setDateFilter] = useState('all'); // 'all', 'today', 'week', 'month'
+            const [displayCards, setDisplayCards] = useState([]);
 
             // LocalStorage key for storing flashcards
             const STORAGE_KEY = 'german_flashcards';
@@ -376,9 +381,55 @@
             const isTranslationPending = newGerman.trim() && !currentTranslation;
             const isReadyToAdd = !!currentTranslation;
 
+            // Shuffle function
+            const shuffleCards = () => {
+                const shuffled = [...displayCards].sort(() => Math.random() - 0.5);
+                setDisplayCards(shuffled);
+                setCurrentCardIndex(0);
+                setIsShuffled(true);
+                setMessage('Cards shuffled!');
+                setTimeout(() => setMessage(''), 2000);
+            };
+
+            // Reset shuffle
+            const resetShuffle = () => {
+                applyDateFilter(dateFilter);
+                setIsShuffled(false);
+                setCurrentCardIndex(0);
+                setMessage('Cards reset to original order');
+                setTimeout(() => setMessage(''), 2000);
+            };
+
+            // Filter by date
+            const applyDateFilter = (filter) => {
+                setDateFilter(filter);
+                const now = new Date();
+                let filtered = [...cards];
+
+                if (filter === 'today') {
+                    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    filtered = cards.filter(card => new Date(card.createdAt) >= todayStart);
+                } else if (filter === 'week') {
+                    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                    filtered = cards.filter(card => new Date(card.createdAt) >= weekAgo);
+                } else if (filter === 'month') {
+                    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                    filtered = cards.filter(card => new Date(card.createdAt) >= monthAgo);
+                }
+
+                setDisplayCards(filtered);
+                setCurrentCardIndex(0);
+                setIsShuffled(false);
+            };
+
+            // Update display cards when cards change
+            useEffect(() => {
+                applyDateFilter(dateFilter);
+            }, [cards]);
+
             // Navigation functions
             const goToNext = () => {
-                if (currentCardIndex < cards.length - 1) {
+                if (currentCardIndex < displayCards.length - 1) {
                     setCurrentCardIndex(currentCardIndex + 1);
                 }
             };
@@ -389,47 +440,44 @@
                 }
             };
 
-            const currentCard = cards[currentCardIndex];
-            const hasCards = cards.length > 0;
+            const currentCard = displayCards[currentCardIndex];
+            const hasCards = displayCards.length > 0;
 
 
             return (
                 <div className="min-h-screen p-4 sm:p-8 bg-gradient-to-br from-[#E0EAFC] to-[#CFDEF3] font-inter">
-                    <header className="text-center mb-10">
-                        <h1 className="text-4xl font-extrabold text-indigo-700">
-                            German Vocabulary Flashcards 
+                    <header className="text-center mb-8">
+                        {/* Logo */}
+                        <div className="flex justify-center mb-4">
+                            <img src="logo.png" alt="Cardio Logo" className="h-16 w-auto transform hover:scale-105 transition duration-200" />
+                        </div>
+                        <h1 className="text-3xl font-bold text-gray-800">
+                            German Flashcards
                         </h1>
-                        <p className="text-sm text-gray-500 mt-2">
-                            Enter a German word, translate it, and click a card to flip it!
-                        </p>
-                        <p className="text-xs text-gray-400 mt-1">
-                            💾 All flashcards are saved locally in your browser
-                        </p>
+                        <p className="text-sm text-gray-500 mt-2">Learn vocabulary with smart flashcards</p>
                     </header>
 
                     {/* Notification/Message area */}
                     {message && (
-                        <div className="bg-indigo-100 border-l-4 border-indigo-500 text-indigo-700 p-4 rounded mb-6 max-w-xl mx-auto" role="alert">
-                            <p className="font-bold">Info</p>
-                            <p>{message}</p>
+                        <div className="bg-white/80 backdrop-blur border border-indigo-200 text-indigo-700 p-3 rounded-lg mb-6 max-w-xl mx-auto shadow-sm text-sm" role="alert">
+                            {message}
                         </div>
                     )}
 
                     {/* Card Creation Form */}
-                    <div className="max-w-xl mx-auto p-6 bg-white rounded-xl shadow-lg mb-10">
-                        <h2 className="text-2xl font-bold mb-4 text-gray-700">Vocabulary Translator &amp; Creator</h2>
+                    <div className="max-w-xl mx-auto p-6 bg-white/90 backdrop-blur rounded-2xl shadow-xl mb-10">
                         <form onSubmit={fetchTranslation} className="space-y-4">
                             
                             <div className="relative">
                                 <input
                                     type="text"
-                                    placeholder="Enter German Word (e.g., Baum or gehen)"
+                                    placeholder="Enter German word..."
                                     value={newGerman}
                                     onChange={(e) => {
                                         setNewGerman(e.target.value);
                                         setCurrentTranslation(null); // Clear translation on new input
                                     }}
-                                    className="w-full p-3 pr-12 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
+                                    className="w-full p-4 pr-12 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
                                     required
                                     disabled={isTranslating || isListening}
                                 />
@@ -467,10 +515,10 @@
                             <button
                                 type="submit"
                                 className={`
-                                    w-full font-bold py-3 rounded-lg shadow-md transition duration-200
+                                    w-full font-semibold py-4 rounded-xl shadow-md transition duration-200
                                     ${isTranslating 
-                                        ? 'bg-gray-400 text-gray-700 cursor-not-allowed' 
-                                        : 'bg-indigo-600 hover:bg-indigo-700 text-white'}
+                                        ? 'bg-gray-300 text-gray-600 cursor-not-allowed' 
+                                        : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white'}
                                     disabled:opacity-50
                                 `}
                                 disabled={actionDisabled || !isTranslationPending}
@@ -483,28 +531,26 @@
                                         </svg>
                                         Translating...
                                     </div>
-                                ) : 'Step 1: Translate Word'}
+                                ) : 'Translate'}
                             </button>
                             
                             {/* Display Translation Result and Add Button */}
                             {currentTranslation && (
-                                <div className="mt-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg space-y-2">
-                                    <p className="text-sm font-semibold text-gray-600">Generated Translation:</p>
-                                    <p className="text-lg font-bold text-indigo-800">
+                                <div className="mt-4 p-4 bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-xl space-y-3">
+                                    <p className="text-lg font-bold text-indigo-900">
                                         {currentTranslation.german.split('\n')[0]} → {currentTranslation.english}
                                     </p>
-                                    {/* Safely display the third line of the German text (the details) */}
-                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                                    <p className="text-sm text-gray-600 whitespace-pre-wrap">
                                         {currentTranslation.german.split('\n')[2]}
                                     </p>
                                     
                                     <button
                                         type="button"
                                         onClick={addCard}
-                                        className="w-full mt-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg shadow-md transition duration-200 disabled:opacity-50"
+                                        className="w-full mt-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-semibold py-4 rounded-xl shadow-md transition duration-200 disabled:opacity-50"
                                         disabled={actionDisabled || !isReadyToAdd}
                                     >
-                                        Step 2: Add Card
+                                        Add Card
                                     </button>
                                 </div>
                             )}
@@ -513,16 +559,54 @@
 
                     {/* Flashcard Display Area */}
                     <div className="max-w-2xl mx-auto">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-3xl font-bold text-gray-700">
-                                Your Flashcards
-                            </h2>
-                            {hasCards && (
-                                <span className="text-lg font-semibold text-indigo-600">
-                                    {currentCardIndex + 1} / {cards.length}
-                                </span>
-                            )}
-                        </div>
+                        {hasCards && (
+                            <div className="space-y-4 mb-6">
+                                {/* Card Counter */}
+                                <div className="flex items-center justify-center">
+                                    <span className="text-xl font-bold text-indigo-700 bg-white/80 backdrop-blur px-6 py-2 rounded-full shadow-md">
+                                        {currentCardIndex + 1} / {displayCards.length}
+                                    </span>
+                                </div>
+
+                                {/* Filter and Shuffle Controls */}
+                                <div className="flex flex-wrap items-center justify-center gap-3">
+                                    {/* Date Filter */}
+                                    <select
+                                        value={dateFilter}
+                                        onChange={(e) => applyDateFilter(e.target.value)}
+                                        className="px-4 py-2 bg-white/90 backdrop-blur border-2 border-indigo-200 rounded-lg text-sm font-semibold text-gray-700 hover:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition duration-200"
+                                    >
+                                        <option value="all">All Cards ({cards.length})</option>
+                                        <option value="today">Today</option>
+                                        <option value="week">This Week</option>
+                                        <option value="month">This Month</option>
+                                    </select>
+
+                                    {/* Shuffle Button */}
+                                    {!isShuffled ? (
+                                        <button
+                                            onClick={shuffleCards}
+                                            className="flex items-center gap-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white font-semibold rounded-lg shadow-md transition duration-200"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                                            </svg>
+                                            Shuffle
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={resetShuffle}
+                                            className="flex items-center gap-2 px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-lg shadow-md transition duration-200"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                            </svg>
+                                            Reset Order
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                         
                         {isLoading && cards.length === 0 && (
                             <div className="text-center p-10 text-gray-500">
@@ -535,9 +619,12 @@
                         )}
                         
                         {!isLoading && cards.length === 0 && (
-                            <div className="text-center p-10 text-gray-500 border border-dashed rounded-lg">
+                            <div className="text-center p-12 text-gray-400 border-2 border-dashed border-gray-300 rounded-2xl">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto mb-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                </svg>
                                 <p className="text-lg">
-                                    No flashcards yet! Use the translator above to start building your German vocabulary list.
+                                    No cards yet
                                 </p>
                             </div>
                         )}
@@ -557,34 +644,27 @@
                                 </div>
 
                                 {/* Navigation Controls */}
-                                <div className="flex items-center justify-center gap-4">
+                                <div className="flex items-center justify-center gap-6 mt-6">
                                     <button
                                         onClick={goToPrevious}
                                         disabled={currentCardIndex === 0}
-                                        className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition duration-200"
+                                        className="p-4 bg-white text-indigo-600 font-semibold rounded-full shadow-lg hover:shadow-xl hover:scale-105 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition duration-200"
                                     >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
                                         </svg>
-                                        Previous
                                     </button>
 
                                     <button
                                         onClick={goToNext}
                                         disabled={currentCardIndex === cards.length - 1}
-                                        className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition duration-200"
+                                        className="p-4 bg-white text-indigo-600 font-semibold rounded-full shadow-lg hover:shadow-xl hover:scale-105 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition duration-200"
                                     >
-                                        Next
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                                         </svg>
                                     </button>
                                 </div>
-
-                                {/* Keyboard Shortcuts Hint */}
-                                <p className="text-center text-sm text-gray-400 mt-4">
-                                    💡 Tip: Click the card to flip it, click the trash icon to mark as learned
-                                </p>
                             </div>
                         )}
                     </div>
